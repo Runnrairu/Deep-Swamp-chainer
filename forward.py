@@ -4,8 +4,47 @@ import chainer.functions as F
 import chainer.links as L
 import numpy as np
 
+def p(t,T,p_T):
+    return 1-float(t)*(1-p_T)/T
+    
 
-        
+
+class time_list(object):
+    def __init__(self, T,N,task_name,hypernet):
+        self.T=T
+        self.N=N
+        self.task_name=task_name
+        self.hypernet=hypernet
+    def __call__(self):
+        if task_name=="ODENet" or task_name=="ResNet",task_name=="test":
+            delta_t,delta_W=ODEnet(self.T,self.N,hypernet)
+        elif task_name =="StochasticDepth":
+            delta_t,delta_W =StochasticDepth(self.T,self.N,hypernet,p_T=0.5)
+        elif task_name =="EularMaruyama" or task_name == "MilsteinNet":
+            delta_t,delta_W=EularMaruyama(self.T,self.N,hypernet,p_T=0.5)
+        elif task_name=="Fukasawa":
+            delta_t,delta_W=Fukasawa(self.T,self.N,hypernet,p_T=0.5)
+        elif task_name == "SDtest":
+            delta_t,delta_W=SDtest(self.T,self.N,hypernet,p_T=0.5)
+        else:
+            print("task_name is invalid!")
+        return delta_t,delta_W
+    def ODEnet(self,T,N):
+        delta_t=[float(T)/(N+1)]*(N+1)
+        delta_W = [0]*(N+1)
+        return delta_t,delta_W
+    def StochasticDepth(self,T,N,p_T=0.5):
+        del_t= float(T)/(N+1)
+        delta_t=[del_t]*(N+1)
+        delta_W = [0]*(N+1)
+        t_now=0
+        a=[0,1]
+        for i in range(N+1):
+            p_t= p(t_now)
+            delta_W[i]= np.random.choice(a, size=None, replace=True, p=[p_t,1-p_t])
+            t_now +=del_t 
+        return delta_t,delta_W
+    def 
 
 
 
