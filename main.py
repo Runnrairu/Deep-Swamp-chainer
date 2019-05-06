@@ -87,7 +87,7 @@ def train(model_object, batchsize=100, gpu_id=gpu_id, max_epoch=200):
     updater = training.StandardUpdater(train_iter, optimizer, device=gpu_id)
 
     # 6. Trainer
-    trainer = training.Trainer(updater, (max_epoch, 'epoch'), out='{}_cifar10augmented_result'.format(model_object.__class__.__name__))
+    trainer = training.Trainer(updater, (max_epoch, 'epoch'), out='log/{}_cifar10augmented_result'.format(model_object.__class__.__name__))
     trainer.extend(extensions.ExponentialShift('lr', 0.5),
                    trigger=triggers.ManualScheduleTrigger([30,60,90,120,150,180,210,240,270,300],'epoch'))
     trigger = triggers.MaxValueTrigger('validation/main/accuracy', trigger=(1, 'epoch'))
@@ -118,5 +118,15 @@ def train(model_object, batchsize=100, gpu_id=gpu_id, max_epoch=200):
 
 
 
+task_name ="Fukasawa"
+
 if __name__ == "__main__":
-    model = train(forward.Hamiltonian(10),batchsize=128,gpu_id=gpu_id, max_epoch=300)
+    
+    T= 1
+    N =52
+    task_name = task_name
+    hypernet= 0
+    model = train(forward.DEmodel(10,T,N,task_name,hypernet),batchsize=128,gpu_id=gpu_id, max_epoch=300)
+    
+    
+    
