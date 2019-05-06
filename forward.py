@@ -2,12 +2,16 @@
 import chainer
 import chainer.functions as F
 import chainer.links as L
+import numpy as np
+
+
+        
 
 
 
 class ReversibleBlock(chainer.Chain):
 
-   def __init__(self, n_in, n_mid,stride=1):
+   
        w = chainer.initializers.HeNormal(1e-2)
        n_out=n_in
        super(ReversibleBlock, self).__init__()
@@ -140,24 +144,3 @@ class Full_RevHamiltonian(chainer.Chain):
         h = F.relu(self.fc4(h))
         h = self.fc5(h)
         return h
-    
-
-
-
-
-class Hamiltonian74(Hamiltonian):
-
-   def __init__(self, n_class=10):
-       super(Hamiltonian74, self).__init__(n_class, [6, 6, 6])
-
-
-class Hamiltonian218(Hamiltonian):
-
-   def __init__(self, n_class=10):
-       super(Hamiltonian218, self).__init__(n_class, [18, 18, 18])
-
-
-class Hamiltonian1202(Hamiltonian):
-
-   def __init__(self, n_class=10):
-       super(Hamiltonian1202, self).__init__(n_class, [100, 100, 100])
