@@ -6,69 +6,111 @@ import numpy as np
 
 def p(t,T,p_T):
     return 1-float(t)*(1-p_T)/T
-    
+
+
+
+def G(t):#Fukasawa_scheme
+    return 1.0
+
+def G_nm(n,t_now):
+    return 1.0/(G(t_now)*n)
 
 
 class time_list(object):
-    def __init__(self, T,N,task_name,hypernet):
+    def __init__(self, T,N,task_name):
         self.T=T
         self.N=N
         self.task_name=task_name
-        self.hypernet=hypernet
     def __call__(self):
         if task_name=="ODENet" or task_name=="ResNet",task_name=="test":
-            delta_t,delta_W=ODEnet(self.T,self.N,hypernet)
+            t,W=ODEnet(self.T,self.N,hypernet)
         elif task_name =="StochasticDepth":
-            delta_t,delta_W =StochasticDepth(self.T,self.N,hypernet,p_T=0.5)
+            t,W =StochasticDepth(self.T,self.N,p_T=0.5)
         elif task_name =="EularMaruyama" or task_name == "MilsteinNet":
-            delta_t,delta_W=EularMaruyama(self.T,self.N,hypernet,p_T=0.5)
+            t,W=EularMaruyama(self.T,self.N)
         elif task_name=="Fukasawa":
-            delta_t,delta_W=Fukasawa(self.T,self.N,hypernet,p_T=0.5)
-        elif task_name == "SDtest":
-            delta_t,delta_W=SDtest(self.T,self.N,hypernet,p_T=0.5)
+            t,W=Fukasawa(self.T,self.N,p_T=0.5)
+        elfi task_name == "SDtest":
+            t,W=SDtest(self.T,self.N,p_T=0.5)
+        
         else:
             print("task_name is invalid!")
-        return delta_t,delta_W
+        return t,W
     def ODEnet(self,T,N):
-        delta_t=[float(T)/(N+1)]*(N+1)
-        delta_W = [0]*(N+1)
-        return delta_t,delta_W
+        t=[float(T)/(N+1)]*(N+1)
+        W = [0]*(N+1)
+        return t,W
     def StochasticDepth(self,T,N,p_T=0.5):
         del_t= float(T)/(N+1)
-        delta_t=[del_t]*(N+1)
-        delta_W = [0]*(N+1)
+        t=[del_t]*(N+1)
+        W = [0]*(N+1)
         t_now=0
         a=[0,1]
         for i in range(N+1):
-            p_t= p(t_now)
-            delta_W[i]= np.random.choice(a, size=None, replace=True, p=[p_t,1-p_t])
+            p_t= p(t_now,T,p_T)
+            W[i]= np.random.choice(a, size=None, replace=True, p=[p_t,1-p_t])
             t_now +=del_t 
         return delta_t,delta_W
-    def 
+    def EularMaruyama(self,T,N):
+        delta_t= float(T)/(N+1)
+        t=[delta_t]*(N+1)
+        sigma=np.sqrt(del_t)
+        W = np.random.normal(0,sigma , N+1)
+        return t,W
+    def Fukasawa(self,T,N):
+        n=N
+        t = [0]*(N+1)
+        W=[0]*(N+1)
+        N_list=np.random.normal(0,1.0,[n+1])
+        E_list=np.random.exponential(1.0,[n+1])
+        t_now=0
+        m=0
+        d=1
+        a= np.power(1+2.0/d,1+d/2.0)
+        while(t_now < (T-a*G_nm(n,t_now)) and m<n):
+
+            N = N_list[m]
+            E = E_list[m]
+            ab_N = np.absolute(N)
+            Z = (ab_N*ab_N+2*E)/d
+            G__nm = G_nm(n,t_now)
+            delta_t = G__nm*a*np.exp(-Z)
+            t[m]= delta_t
+            t_now += delta_t
+            #if t_now>T:
+
+            #    t_now -= delta_t
+
+            #    break
+            W[m] = np.power(G__nm*a*d*Z*np.exp(-Z),0.5)*N/ab_N
+            m+=1
+        delta_euler_t = (T-t_now)/(n-m+1)
+        sigma_euler_t = np.power(delta_euler_t,0.5)
+        for i in range(n-m+1):
+            t[m+i] = delta_euler_t
+            W[m+i] = sigma_euler_t*N_list[m+i]
+        return t,W
+    def SDtest(self,T,N,p_T=0.5):
+        t=[0]*(N+1)
+        W = [0]*(N+1)
+        t_now=0
+        delta_t= float(T)/(N+1)
+        for i in range(N+1):
+            t[i]=p(t_now,T,p_T)
+            t_now+=delta_t
+        return t,W
+        
 
 
-
-class ReversibleBlock(chainer.Chain):
-
+class flowBlock(chainer.ChainList):
+    def __init__(self, channnel,depth,T,N,hypernet=0,task_name):
+        super(flowBlock, self).__init__()
    
-       w = chainer.initializers.HeNormal(1e-2)
-       n_out=n_in
-       super(ReversibleBlock, self).__init__()
-       with self.init_scope():
-           self.bn1_1 = L.BatchNormalization(n_mid)
-           self.conv1 = L.Convolution2D(n_in, n_mid, 3,stride,1, False, w)
-           self.bn1_2 = L.BatchNormalization(n_mid)
-           self.bn1_3 = L.BatchNormalization(n_mid)
-           self.K_1=self.conv1.W
-           self.bn2_1 = L.BatchNormalization(n_mid)
-           self.conv2 = L.Convolution2D(n_in, n_mid, 3, stride, 1, False, w)
-           self.bn2_2 = L.BatchNormalization(n_mid)
-           self.bn2_3 = L.BatchNormalization(n_mid)
-           self.K_2=self.conv2.W
+       
 
            
 
-   def __call__(self, y,z):
+   def __call__(self, x):
        h = self.bn1_1(z)
        h = self.conv1(h)
        h = self.bn1_2(h) 
