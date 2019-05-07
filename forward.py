@@ -101,38 +101,20 @@ class time_list(object):
         return t,W
         
 
-
-class flowBlock(chainer.ChainList):
+class flowBlock(chainer.Chain):
     def __init__(self, channnel,depth,T,N,hypernet=0,task_name):
         super(flowBlock, self).__init__()
    
-       
+        
 
            
 
-   def __call__(self, x):
-       h = self.bn1_1(z)
-       h = self.conv1(h)
-       h = self.bn1_2(h) 
-       h = F.relu(h)
-
+    def __call__(self,t,x):
        
-       h = F.deconvolution_2d(h,self.K_1,stride=1,pad=1)
-       h= self.bn1_3(h)
-       y_next= y+h
-
-       g = self.bn2_1(y_next)
+        
+        
        
-       
-       g = self.conv2(g)
-       
-       g = self.bn2_2(g)
-       g = F.relu(g)
-       
-       g = F.deconvolution_2d(g,self.K_2,stride=1,pad=1)
-       g= self.bn2_3(g)
-       z_next = z-g
-       return  y_next,z_next
+       return  x+f(x)
 
 
 
