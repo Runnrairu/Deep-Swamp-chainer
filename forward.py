@@ -127,6 +127,24 @@ class flowBlock(chainer.Chain):
                 return x+delta_t*h
         else:
             #Milstein
+class param_gen(chainer.Chain):
+    def __init__(self,3*channel,task_name,hypernet,Res):
+        super(param_gen, self).__init__()
+        self.Res=Res
+        self.hypernet=hypernet
+        if Res:
+            
+        elif hypernet:
+            L.
+        else:
+            
+    
+    def __call__(self,t):
+        
+        
+        
+        
+        return W1,b1,W2,b2
 
 class FlowNet(chainer.Chain):
     def __init__(self, n_class,dense,channel,T,N,task_name,hypernet,first_conv=False,train_=True):
@@ -139,9 +157,12 @@ class FlowNet(chainer.Chain):
         self.first_conv=first_conv
         self.timelist=time_list(T,N,task_name)
         w = chainer.initializers.HeNormal(1e-2)
+        Res=False
+        if task_name=="ResNet" or task_name== "StochasticDepth":
+            self.Res=True
         if first_conv:
             self.firstconvf=L.Convolution_2D(3,3*channel,3,1,1,False,w)
-        self.param_gen=param_gen(3*channel,task_name,hypernet)# new class
+        self.paramgen=param_gen(3*channel,task_name,hypernet,Res)# new class
         self.train=train_
         self.SD=False
         self.Mil=False
@@ -169,7 +190,7 @@ class FlowNet(chainer.Chain):
         t,W=self.timelist()
         t_now=0
         for i in range(self.N+1):
-            W1,b1,W2,b2=
+            W1,b1,W2,b2=paramgen(t)
             p_t=p(t_now,self.T,self.N)
             x=flowBlock(x,t[i],W[i],t_now,W1,b1,W2,b2,self.SD=False,p_t,self.Mil=False)
             t_now += t[i]
