@@ -45,7 +45,7 @@ class time_list(object):
         t=[del_t]*(N+1)
         W = [0]*(N+1)
         t_now=0
-        a=[0,1]
+        a=[1,0]#p_tの情報含めたほうが早そう
         for i in range(N+1):
             p_t= p(t_now,T,p_T)
             W[i]= np.random.choice(a, size=None, replace=True, p=[p_t,1-p_t])
@@ -101,109 +101,89 @@ class time_list(object):
         return t,W
         
 
+        
+        
+
+
 class flowBlock(chainer.Chain):
-    def __init__(self, channnel,depth,T,N,hypernet=0,task_name):
+    def __init__(self, stride=1,pad=1):
         super(flowBlock, self).__init__()
-   
+        self.stride=stride
+        self.pad=pad
+    def __call__(self,x,delta_t,delta_W,t_now,W1,b1,W2,b2,SD=False,p_t=1,Mil=False):
+        if not Mil and not SD:
+            h=F.convolution_2d(x,W1,b1,self.stride,self.pad)
+            h=F.swish(h,1.)
+            h=F.convolution_2d(h,W2,b2,self.stride,self.pad)
+                return x+delta_t*p_t*h+np.sqrt(p_t*(1-p_t))*h*delta_W
+
+        elif SD:
+            if delta_W = 0:
+                return x
+            else:
+                h=F.convolution_2d(x,W1,b1,self.stride,self.pad)
+                h=F.swish(h,1.)
+                h=F.convolution_2d(h,W2,b2,self.stride,self.pad)
+                return x+delta_t*h
+        else:
+            #Milstein
+
+class FlowNet(chainer.Chain):
+    def __init__(self, n_class,dense,channel,T,N,task_name,hypernet,first_conv=False,train_=True):
+        super(FlowNet,self).__init__()
+        self.channel=channel
+        self.T=T
+        self.N=N
+        self.task_name=task_name
+        self.hypernet=hypernet
+        self.first_conv=first_conv
+        self.timelist=time_list(T,N,task_name)
+        w = chainer.initializers.HeNormal(1e-2)
+        if first_conv:
+            self.firstconvf=L.Convolution_2D(3,3*channel,3,1,1,False,w)
+        self.param_gen=param_gen(3*channel,task_name,hypernet)# new class
+        self.train=train_
+        self.SD=False
+        self.Mil=False
+        if train_ and task_name=="StochasticDepth" :
+            self.SD=True
+        elif train_ and task_name == "Milstein":
+            self.Mil=True
+        if not train:
+            if task_name=="StochasticDepth" or task_name=="EularMaruyama" or task_name=="Fukasawa" or task_name =="Milstein":
+                task_name=="SDtest"
+        self.timelist=time_list(T,N,task_name)
+        self.dense=dense
+        if dense:
+            self.fc1=L.Linear(3*channel,dense)
+            self.fc2=L.Linear(dense,n_class)
+        else:
+            self.fc=L.Linear(3*channel,class)
+            
+    def __call__(self,x,t=None):
         
-
-           
-
-    def __call__(self,t,x):
-       
+        if self.first_conv:
+            x=self.firstconvf(x)
+        else:
+            #タイル
+        t,W=self.timelist()
+        t_now=0
+        for i in range(self.N+1):
+            W1,b1,W2,b2=
+            p_t=p(t_now,self.T,self.N)
+            x=flowBlock(x,t[i],W[i],t_now,W1,b1,W2,b2,SD=False,p_t,Mil=False)
+            t_now += t[i]
+        x=F.average_pooling_2d(x, x.shape[2:])
+        if self.dense:
+            x=self.fc1(x)
+            y=self.fc2(x)
+        else self.dense:
+            y=self.fc(x)
+        if self.train:
+            return F.softmax_cross_entropy(y, t), F.accuracy(y, t) 
+        ekse:
+            return y
         
-        
-       
-       return  x+f(x)
-
-
-
-
-
-
-
-class Block(chainer.ChainList):
-
-   def __init__(self, n_in, n_mid, n_bottlenecks, stride=1):
-       super(Block, self).__init__()
-       
-       for _ in range(n_bottlenecks):
-           self.add_link(ReversibleBlock(n_in, n_mid))
-
-   def __call__(self, y,z):
-       for f in self:
-           y,z = f(y,z)
-       return y,z
-
-
-
-
-
-class Hamiltonian(chainer.Chain):
-
-   def __init__(self, n_class=10, n_blocks=[6,6,6]):
-       super(Hamiltonian, self).__init__()
-
-       with self.init_scope():
-           w = chainer.initializers.HeNormal()
-           
-           self.con =L.Convolution2D(3, 32, 3, 1, 1, False, w)
-           self.bn =  L.BatchNormalization(32)
-           self.res1 = Block(16, 16, n_blocks[0], 1)
-           self.res2 = Block(32, 32,  n_blocks[1], 1)
-           self.res3 = Block(56, 56,  n_blocks[2], 1)
-           #self.fc4 = L.Linear(112, 100)
-           #self.fc5 = L.Linear(100, n_class)
-           
-           self.fc = L.Linear(112, n_class)
-           
-
-   def __call__(self, x):
-       x_ = self.con(x)
-       x_ = self.bn(x_)
-       y = x_[:,0:16,:,:]
-       z = x_[:,16:32,:,:]
-       
-       y,z = self.res1(y,z)
-       y,z= F.average_pooling_2d(y,2,stride=2),F.average_pooling_2d(z, 2,stride=2)
-       y,z = F.pad(y,[(0,0),(0,16),(0,0),(0,0)],"constant",constant_values=0),F.pad(z,[(0,0),(0,16),(0,0),(0,0)],"constant",constant_values=0)
-       y,z = self.res2(y,z)
-       y,z=  F.average_pooling_2d(y, 2,stride=2),F.average_pooling_2d(z, 2,stride=2)
-       y,z= F.pad(y,[(0,0),(0,24),(0,0),(0,0)],"constant",constant_values=0),F.pad(z,[(0,0),(0,24),(0,0),(0,0)],"constant",constant_values=0)
-       y,z = self.res3(y,z)
-       h=F.concat((y,z),axis=1)
-       h = F.average_pooling_2d(h, h.shape[2:])#global
-       h = F.reshape(h,[-1, 112])
-       #h = F.relu(self.fc4(h))
-       #h = self.fc5(h)
-       
-       h = self.fc(h)
-       return h
-
-class Full_RevHamiltonian(chainer.Chain):
-    def __init__(self, n_class=10, n_blocks=[6,6,6]):
-        super(Full_RevHamiltonian, self).__init__()
-
-        with self.init_scope():
-            w = chainer.initializers.HeNormal()
-           
-            self.con =L.Convolution2D(3, 128, 3, 1, 1, False, w)
-            self.res1 = Block(64, 64, n_blocks[0], 1)
-            self.res2 = Block(64, 64, n_blocks[1], 1)
-            self.res3 = Block(64, 64, n_blocks[2], 1)
-            self.fc4 = L.Linear(32*32*128, 1000)
-            self.fc5 = L.Linear(1000, n_class)
-    def __call__(self, x):
-        x_ = self.con(x)
-        y = x_[:,0:64,:,:]
-        z = x_[:,64:128,:,:]
-       
-        y,z = self.res1(y,z)
-        y,z =self.res2(y,z)
-        y,z=self.res3(y,z)
-        h=F.concat((y,z),axis=1)
-        
-        h = F.reshape(h,[-1, 128*32*32])
-        h = F.relu(self.fc4(h))
-        h = self.fc5(h)
-        return h
+            
+            
+            
