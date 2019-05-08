@@ -171,7 +171,7 @@ class FlowNet(chainer.Chain):
         for i in range(self.N+1):
             W1,b1,W2,b2=
             p_t=p(t_now,self.T,self.N)
-            x=flowBlock(x,t[i],W[i],t_now,W1,b1,W2,b2,SD=False,p_t,Mil=False)
+            x=flowBlock(x,t[i],W[i],t_now,W1,b1,W2,b2,self.SD=False,p_t,self.Mil=False)
             t_now += t[i]
         x=F.average_pooling_2d(x, x.shape[2:])
         if self.dense:
