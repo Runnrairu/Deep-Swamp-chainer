@@ -78,7 +78,6 @@ class time_list(object):
             t[m]= delta_t
             t_now += delta_t
             #if t_now>T:
-
             #    t_now -= delta_t
 
             #    break
@@ -115,7 +114,7 @@ class flowBlock(chainer.Chain):
             h=F.convolution_2d(x,W1,b1,self.stride,self.pad)
             h=F.swish(h,1.)
             h=F.convolution_2d(h,W2,b2,self.stride,self.pad)
-                return x+delta_t*p_t*h+np.sqrt(p_t*(1-p_t))*h*delta_W
+            return x+delta_t*p_t*h+np.sqrt(p_t*(1-p_t))*h*delta_W
 
         elif SD:
             if delta_W = 0:
@@ -127,24 +126,48 @@ class flowBlock(chainer.Chain):
                 return x+delta_t*h
         else:
             #Milstein
+            
+            
+            
+            
 class param_gen(chainer.Chain):
-    def __init__(self,3*channel,task_name,hypernet,Res):
+    def __init__(self,channel,task_name,hypernet,Res):
         super(param_gen, self).__init__()
         self.Res=Res
         self.hypernet=hypernet
+        self.channel=channel
         if Res:
-            
-        elif hypernet:
-            L.
+            #chainLink
+        
         else:
-            
-    
+            self.flowcon1_param=L.Convolution_2D(channel,channel,3,pad=1,stride=1)    
+            self.flowcon2_param=L.Convolution_2D(channel,channel,3,pad=1,stride=1) 
+        if hypernet:
+            self.hy1=L.Linear(1,100)
+            self.hy2=L.Linear(100,2*channel)
     def __call__(self,t):
         
-        
-        
-        
+        if Res:
+            a
+        elif hypernet:
+            h_1,h_2=hypernet_t(t)
+            W1=self.flowcon1_param.W*h_1
+            W2=self.flowcon2_param.W*h_2
+            b1=self.flowcon1_param.b
+            b2=self.flowcon2_param.b
+        else:#ODENET
+            W1=self.flowcon1_param.W
+            W2=self.flowcon2_param.W
+            b1=self.flowcon1_param.b
+            b2=self.flowcon2_param.b
         return W1,b1,W2,b2
+    def hypernet_t(self,t):
+        h=self.hy1(t)
+        h=F.relu(h)
+        h=self.hy2(h)
+        
+        return h[0:self.channel],h[self.channel,2*self.channel]
+        
 
 class FlowNet(chainer.Chain):
     def __init__(self, n_class,dense,channel,T,N,task_name,hypernet,first_conv=False,train_=True):
@@ -170,9 +193,15 @@ class FlowNet(chainer.Chain):
             self.SD=True
         elif train_ and task_name == "Milstein":
             self.Mil=True
+        if task_name=="StochasticDepth" or task_name=="EularMaruyama" or task_name=="Fukasawa" or task_name =="Milstein":
+            self.prob=True
+        else:
+            self.prob=False
         if not train:
             if task_name=="StochasticDepth" or task_name=="EularMaruyama" or task_name=="Fukasawa" or task_name =="Milstein":
                 task_name=="SDtest"
+            else:
+                task_name=="test"
         self.timelist=time_list(T,N,task_name)
         self.dense=dense
         if dense:
@@ -191,8 +220,11 @@ class FlowNet(chainer.Chain):
         t_now=0
         for i in range(self.N+1):
             W1,b1,W2,b2=paramgen(t)
-            p_t=p(t_now,self.T,self.N)
-            x=flowBlock(x,t[i],W[i],t_now,W1,b1,W2,b2,self.SD=False,p_t,self.Mil=False)
+            if self.prob:
+                p_t=p(t_now,self.T,self.N)
+            else:
+                p_t=1
+            x=flowBlock(x,t[i],W[i],t_now,W1,b1,W2,b2,self.SD,p_t,self.Mil)
             t_now += t[i]
         x=F.average_pooling_2d(x, x.shape[2:])
         if self.dense:
@@ -202,7 +234,7 @@ class FlowNet(chainer.Chain):
             y=self.fc(x)
         if self.train:
             return F.softmax_cross_entropy(y, t), F.accuracy(y, t) 
-        ekse:
+        else:
             return y
         
             
