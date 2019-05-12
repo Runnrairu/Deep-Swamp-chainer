@@ -126,7 +126,7 @@ if __name__ == "__main__":
     N =52
     task_name = task_name
     hypernet= 0
-    model = train(forward.DEmodel(10,T,N,task_name,hypernet),batchsize=128,gpu_id=gpu_id, max_epoch=300)
+    model = train(forward.FlowNet(10,T,N,task_name,hypernet),batchsize=128,gpu_id=gpu_id, max_epoch=300)
     
     
     
