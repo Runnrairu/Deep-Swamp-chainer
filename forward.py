@@ -22,16 +22,17 @@ class time_list(object):
         self.N=N
         self.task_name=task_name
     def __call__(self):
+        p_T=0.5
         if task_name=="ODENet" or task_name=="ResNet",task_name=="test":
-            t,W=ODEnet(self.T,self.N,hypernet)
+            t,W=ODEnet(self.T,self.N)
         elif task_name =="StochasticDepth":
-            t,W =StochasticDepth(self.T,self.N,p_T=0.5)
+            t,W =StochasticDepth(self.T,self.N,p_T)
         elif task_name =="EularMaruyama" or task_name == "MilsteinNet":
             t,W=EularMaruyama(self.T,self.N)
         elif task_name=="Fukasawa":
-            t,W=Fukasawa(self.T,self.N,p_T=0.5)
+            t,W=Fukasawa(self.T,self.N,p_T)
         elfi task_name == "SDtest":
-            t,W=SDtest(self.T,self.N,p_T=0.5)
+            t,W=SDtest(self.T,self.N,p_T)
         
         else:
             print("task_name is invalid!")
@@ -131,25 +132,19 @@ class flowBlock(chainer.Chain):
             
             
 class param_gen(chainer.Chain):
-    def __init__(self,channel,task_name,hypernet,Res):
+    def __init__(self,channel,hypernet):
         super(param_gen, self).__init__()
         self.Res=Res
         self.hypernet=hypernet
         self.channel=channel
-        if Res:
-            #chainLink
-        
-        else:
-            self.flowcon1_param=L.Convolution_2D(channel,channel,3,pad=1,stride=1)    
-            self.flowcon2_param=L.Convolution_2D(channel,channel,3,pad=1,stride=1) 
+
+        self.flowcon1_param=L.Convolution_2D(channel,channel,3,pad=1,stride=1)    
+        self.flowcon2_param=L.Convolution_2D(channel,channel,3,pad=1,stride=1) 
         if hypernet:
             self.hy1=L.Linear(1,100)
             self.hy2=L.Linear(100,2*channel)
     def __call__(self,t):
-        
-        if Res:
-            a
-        elif hypernet:
+        if hypernet:
             h_1,h_2=hypernet_t(t)
             W1=self.flowcon1_param.W*h_1
             W2=self.flowcon2_param.W*h_2
@@ -170,7 +165,7 @@ class param_gen(chainer.Chain):
         
 
 class FlowNet(chainer.Chain):
-    def __init__(self, n_class,dense,channel,T,N,task_name,hypernet,first_conv=False,train_=True):
+    def __init__(self, n_class,dense=False,channel,T,N,task_name,hypernet=False,first_conv=False,train_=True):
         super(FlowNet,self).__init__()
         self.channel=channel
         self.T=T
@@ -180,12 +175,12 @@ class FlowNet(chainer.Chain):
         self.first_conv=first_conv
         self.timelist=time_list(T,N,task_name)
         w = chainer.initializers.HeNormal(1e-2)
-        Res=False
+        self.Res=False
         if task_name=="ResNet" or task_name== "StochasticDepth":
             self.Res=True
         if first_conv:
             self.firstconvf=L.Convolution_2D(3,3*channel,3,1,1,False,w)
-        self.paramgen=param_gen(3*channel,task_name,hypernet,Res)# new class
+        self.paramgen=param_gen(3*channel,hypernet)
         self.train=train_
         self.SD=False
         self.Mil=False
@@ -197,8 +192,8 @@ class FlowNet(chainer.Chain):
             self.prob=True
         else:
             self.prob=False
-        if not train:
-            if task_name=="StochasticDepth" or task_name=="EularMaruyama" or task_name=="Fukasawa" or task_name =="Milstein":
+        if not self.train:
+            if self.prob:
                 task_name=="SDtest"
             else:
                 task_name=="test"
@@ -218,14 +213,18 @@ class FlowNet(chainer.Chain):
             #タイル
         t,W=self.timelist()
         t_now=0
-        for i in range(self.N+1):
-            W1,b1,W2,b2=paramgen(t)
-            if self.prob:
-                p_t=p(t_now,self.T,self.N)
-            else:
-                p_t=1
-            x=flowBlock(x,t[i],W[i],t_now,W1,b1,W2,b2,self.SD,p_t,self.Mil)
-            t_now += t[i]
+        if self.Res:
+            x=ResNet(x,self.prob,self.train)
+            
+        else:
+            for i in range(self.N+1):
+                W1,b1,W2,b2=self.paramgen(t)
+                if self.prob:
+                    p_t=p(t_now,self.T,self.N)
+                else:
+                    p_t=1
+                x=flowBlock(x,t[i],W[i],t_now,W1,b1,W2,b2,p_t,self.Mil)
+                t_now += t[i]
         x=F.average_pooling_2d(x, x.shape[2:])
         if self.dense:
             x=self.fc1(x)
