@@ -103,6 +103,41 @@ class time_list(object):
 
         
         
+class ResidualBlock(chainer.Chain):
+   def __init__(self, channel):
+       w = chainer.initializers.HeNormal(1e-2)
+       super(ReversibleBlock, self).__init__()
+       with self.init_scope():
+           self.conv1 = L.Convolution2D(channel, channel, 3,stride=1,1, False, w)
+           self.conv2 = L.Convolution2D(channel, channel, 3, stride=1, 1, False, w) 
+   def __call__(self, x):
+       h = self.conv1(x) 
+       h = F.relu(h)
+       h = self.conv2(h)
+       return  h
+    
+
+        
+        
+
+class Block(chainer.ChainList):
+
+   def __init__(self, channel,N):
+       super(Block, self).__init__()
+       for _ in range(N):
+           self.add_link(ResidualBlock(channel))
+
+   def __call__(self, x,prob,train,t,W):
+       step=0
+       for f in self:
+           if train and W[step]=0:
+               x=x
+           else:        
+               x = x+t[step]*f(x)
+           step +=1
+           
+       return x
+    
 
 
 class flowBlock(chainer.Chain):
@@ -111,15 +146,11 @@ class flowBlock(chainer.Chain):
         self.stride=stride
         self.pad=pad
     def __call__(self,x,delta_t,delta_W,t_now,W1,b1,W2,b2,SD=False,p_t=1,Mil=False):
-        if not Mil and not SD:
+        if not Mil :
             h=F.convolution_2d(x,W1,b1,self.stride,self.pad)
             h=F.swish(h,1.)
             h=F.convolution_2d(h,W2,b2,self.stride,self.pad)
             return x+delta_t*p_t*h+np.sqrt(p_t*(1-p_t))*h*delta_W
-
-        elif SD:
-            if delta_W = 0:
-                return x
             else:
                 h=F.convolution_2d(x,W1,b1,self.stride,self.pad)
                 h=F.swish(h,1.)
@@ -178,6 +209,7 @@ class FlowNet(chainer.Chain):
         self.Res=False
         if task_name=="ResNet" or task_name== "StochasticDepth":
             self.Res=True
+            self.ResNet=Block(3*channel,N)
         if first_conv:
             self.firstconvf=L.Convolution_2D(3,3*channel,3,1,1,False,w)
         self.paramgen=param_gen(3*channel,hypernet)
@@ -214,7 +246,7 @@ class FlowNet(chainer.Chain):
         t,W=self.timelist()
         t_now=0
         if self.Res:
-            x=ResNet(x,self.prob,self.train)
+            x=ResNet(x,self.prob,self.train,t,W)
             
         else:
             for i in range(self.N+1):
