@@ -112,7 +112,7 @@ class ResidualBlock(chainer.Chain):
            self.conv2 = L.Convolution2D(channel, channel, 3, stride=1, 1, False, w) 
    def __call__(self, x):
        h = self.conv1(x) 
-       h = F.relu(h)
+       h = F.swish(h)
        h = self.conv2(h)
        return  h
     
@@ -177,8 +177,8 @@ class param_gen(chainer.Chain):
     def __call__(self,t):
         if hypernet:
             h_1,h_2=hypernet_t(t)
-            W1=self.flowcon1_param.W*h_1
-            W2=self.flowcon2_param.W*h_2
+            W1=self.flowcon1_param.W*h_1.reshape(channnel,1,1,1)
+            W2=self.flowcon2_param.W*h_2.reshape(channnel,1,1,1)
             b1=self.flowcon1_param.b
             b2=self.flowcon2_param.b
         else:#ODENET
@@ -188,8 +188,10 @@ class param_gen(chainer.Chain):
             b2=self.flowcon2_param.b
         return W1,b1,W2,b2
     def hypernet_t(self,t):
+        t=np.array([t])
+        t=t.astype(np.float32)
         h=self.hy1(t)
-        h=F.relu(h)
+        h=F.swish(h)
         h=self.hy2(h)
         
         return h[0:self.channel],h[self.channel,2*self.channel]
