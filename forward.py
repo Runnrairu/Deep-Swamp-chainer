@@ -244,7 +244,7 @@ class FlowNet(chainer.Chain):
         if self.first_conv:
             x=self.firstconvf(x)
         else:
-            #タイル
+            x = F.pad(x,[(0,0),(0,3*channel-3),(0,0),(0,0)],"constant",constant_values=0)
         t,W=self.timelist()
         t_now=0
         if self.Res:
