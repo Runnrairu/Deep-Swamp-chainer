@@ -195,11 +195,24 @@ class param_gen(chainer.Chain):
         h=self.hy2(h)
         
         return h[0:self.channel],h[self.channel,2*self.channel]
-        
 
-class FlowNet(chainer.Chain):
+    
+
+class flow_net(chainer.Chain):
+    def __init__(self,task_name,train,hypernet):
+        super(flow_net,self).__init__()
+        self.task_name=task_name
+        self.train~train
+        self.hypernet=hypernet
+        
+    
+
+
+
+
+class model(chainer.Chain):
     def __init__(self, n_class,dense=False,channel,T,N,task_name,hypernet=False,first_conv=False,train_=True):
-        super(FlowNet,self).__init__()
+        super(model,self).__init__()
         self.channel=channel
         self.T=T
         self.N=N
@@ -207,25 +220,10 @@ class FlowNet(chainer.Chain):
         self.hypernet=hypernet
         self.first_conv=first_conv
         self.timelist=time_list(T,N,task_name)
-        w = chainer.initializers.HeNormal(1e-2)
-        self.Res=False
-        if task_name=="ResNet" or task_name== "StochasticDepth":
-            self.Res=True
-            self.ResNet=Block(3*channel,N)
+        w = chainer.initializers.HeNormal(1e-2)        
         if first_conv:
             self.firstconvf=L.Convolution_2D(3,3*channel,3,1,1,False,w)
-        self.paramgen=param_gen(3*channel,hypernet)
         self.train=train_
-        self.SD=False
-        self.Mil=False
-        if train_ and task_name=="StochasticDepth" :
-            self.SD=True
-        elif train_ and task_name == "Milstein":
-            self.Mil=True
-        if task_name=="StochasticDepth" or task_name=="EularMaruyama" or task_name=="Fukasawa" or task_name =="Milstein":
-            self.prob=True
-        else:
-            self.prob=False
         if not self.train:
             if self.prob:
                 task_name=="SDtest"
@@ -233,6 +231,8 @@ class FlowNet(chainer.Chain):
                 task_name=="test"
         self.timelist=time_list(T,N,task_name)
         self.dense=dense
+        self.flow=flow_net(self.task_name,self.task_name,self.hypernet)
+        
         if dense:
             self.fc1=L.Linear(3*channel,dense)
             self.fc2=L.Linear(dense,n_class)
@@ -244,21 +244,9 @@ class FlowNet(chainer.Chain):
         if self.first_conv:
             x=self.firstconvf(x)
         else:
-            x = F.pad(x,[(0,0),(0,3*channel-3),(0,0),(0,0)],"constant",constant_values=0)
+            x = F.pad(x,[(0,0),(0,3*self.channel-3),(0,0),(0,0)],"constant",constant_values=0)
         t,W=self.timelist()
-        t_now=0
-        if self.Res:
-            x=ResNet(x,self.prob,self.train,t,W)
-            
-        else:
-            for i in range(self.N+1):
-                W1,b1,W2,b2=self.paramgen(t)
-                if self.prob:
-                    p_t=p(t_now,self.T,self.N)
-                else:
-                    p_t=1
-                x=flowBlock(x,t[i],W[i],t_now,W1,b1,W2,b2,p_t,self.Mil)
-                t_now += t[i]
+        x=flow_net(x,t,W)
         x=F.average_pooling_2d(x, x.shape[2:])
         if self.dense:
             x=self.fc1(x)
@@ -269,7 +257,4 @@ class FlowNet(chainer.Chain):
             return F.softmax_cross_entropy(y, t), F.accuracy(y, t) 
         else:
             return y
-        
-            
-            
-            
+
