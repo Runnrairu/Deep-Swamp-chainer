@@ -51,7 +51,7 @@ class time_list(object):
             p_t= p(t_now,T,p_T)
             W[i]= np.random.choice(a, size=None, replace=True, p=[p_t,1-p_t])
             t_now +=del_t 
-        return delta_t,delta_W
+        return t,W
     def EularMaruyama(self,T,N):
         delta_t= float(T)/(N+1)
         t=[delta_t]*(N+1)
@@ -199,11 +199,29 @@ class param_gen(chainer.Chain):
     
 
 class flow_net(chainer.Chain):
-    def __init__(self,task_name,train,hypernet):
+    def __init__(self,task_name,train,hypernet,T,N,p_T=0.5):
         super(flow_net,self).__init__()
         self.task_name=task_name
         self.train~train
         self.hypernet=hypernet
+        if task_name=="ResNet":
+            self.flow=ResNet(T,N)
+        elif task_name=="StochasticDepth":
+            self.flow=SD(T,N,p_T,train)
+        elif task_name=="ODEnet":
+            self.flow=ODE(T,N,hypernet)
+        elif task_name=="SDEnet":
+            self.flow=SDEnet(T,N,hypernet,train)
+        elif task_name=="Milstein":
+            pass
+        elif task_name=="Fukasawa":
+            self.flow=Fukasawa(T,N,hypernet,train)
+
+        else:
+            print("invalid!")
+            raise NotFoundError
+    def __call__(self,x,t,W):
+        
         
     
 
@@ -231,7 +249,7 @@ class model(chainer.Chain):
                 task_name=="test"
         self.timelist=time_list(T,N,task_name)
         self.dense=dense
-        self.flow=flow_net(self.task_name,self.task_name,self.hypernet)
+        self.flow=flow_net(self.task_name,self.task_name,self.hypernet,self.T,self.N)
         
         if dense:
             self.fc1=L.Linear(3*channel,dense)
