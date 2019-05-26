@@ -183,7 +183,7 @@ class param_gen(chainer.Chain):
 class DeepSwamp(chainer.Chain):
 
     def __init__(self, T,N,p_T,channel,hypernet):
-        super(SD, self).__init__()
+        super(DeepSwamp, self).__init__()
         self.T=T
         self.N=N
         self.p_T=p_T
@@ -194,7 +194,8 @@ class DeepSwamp(chainer.Chain):
         t_now=0
         for delta_t in t: 
             p_t=p(t_now,self.T,self.p_T)
-            f_x=f(x,self.param(t))
+            W1,b1,W2,b2 = self.param(t)
+            f_x=f(x,W1,b1,W2,b2)
             if train:        
                 x = x+p_t*t[step]*f_x+np.sqrt(p_t*(1-p_t))*W[step]*f_x
             else:#test
@@ -226,7 +227,7 @@ class flow_net(chainer.Chain):
         elif task_name=="Milstein":
             pass
         elif task_name=="Fukasawa":
-            self.flow=Fukasawa(T,N,p_T,channel,hypernet)
+            self.flow=DeepSwamp(T,N,p_T,channel,hypernet)
 
         else:
             print("invalid!")
@@ -241,7 +242,7 @@ class flow_net(chainer.Chain):
 
 
 class model(chainer.Chain):
-    def __init__(self, n_class,dense=0,channel,T,N,task_name,hypernet=False,first_conv=False,train_=True):
+    def __init__(self, n_class,dense=0,channel,T,N,task_name,hypernet=False,first_conv=False):
         super(model,self).__init__()
         self.channel=channel
         self.first_conv=first_conv
@@ -249,7 +250,7 @@ class model(chainer.Chain):
         w = chainer.initializers.HeNormal(1e-2)        
         if first_conv:
             self.firstconvf=L.Convolution_2D(3,channel,3,1,1,False,w)
-        self.train=train_
+        
         self.timelist=time_list(T,N,task_name)
         self.dense=dense
         self.flow=flow_net(task_name,hypernet,T,N,channel,train)
@@ -260,14 +261,14 @@ class model(chainer.Chain):
         else:
             self.fc=L.Linear(channel,class)
             
-    def __call__(self,x):
+    def __call__(self,x,train):
         
         if self.first_conv:
             x=self.firstconvf(x)
         else:
             x = F.pad(x,[(0,0),(0,self.channel-3),(0,0),(0,0)],"constant",constant_values=0)
         t,W=self.timelist()
-        x=flow_net(x,t,W,self.train)
+        x=flow_net(x,t,W,train)
         x=F.average_pooling_2d(x, x.shape[2:])
         if self.dense:
             x=self.fc1(x)
