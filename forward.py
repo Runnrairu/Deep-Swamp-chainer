@@ -106,7 +106,7 @@ class time_list(object):
 class ResidualBlock(chainer.Chain):
    def __init__(self, channel):
        w = chainer.initializers.HeNormal(1e-2)
-       super(ReversibleBlock, self).__init__()
+       super(ResidualBlock, self).__init__()
        with self.init_scope():
            self.conv1 = L.Convolution2D(channel, channel, 3,stride=1,1, False, w)
            self.conv2 = L.Convolution2D(channel, channel, 3, stride=1, 1, False, w) 
@@ -120,44 +120,30 @@ class ResidualBlock(chainer.Chain):
         
         
 
-class Block(chainer.ChainList):
+class SD(chainer.ChainList):
 
-   def __init__(self, channel,N):
-       super(Block, self).__init__()
+   def __init__(self, T,N,p_T,channel):
+       super(SD, self).__init__()
+       self.T=T
+       self.N=N
+       self.p_T=p_T
        for _ in range(N):
            self.add_link(ResidualBlock(channel))
 
-   def __call__(self, x,prob,train,t,W):
+   def __call__(self, x,t,W,train):
        step=0
        for f in self:
            if train and W[step]=0:
                x=x
-           else:        
+           elif train:        
                x = x+t[step]*f(x)
+           else:#test
+               x=x+p(step*self.T/(self.N+1),self.T,self.p_T)*t[step]*f(x)
            step +=1
            
        return x
     
-
-
-class flowBlock(chainer.Chain):
-    def __init__(self, stride=1,pad=1):
-        super(flowBlock, self).__init__()
-        self.stride=stride
-        self.pad=pad
-    def __call__(self,x,delta_t,delta_W,t_now,W1,b1,W2,b2,SD=False,p_t=1,Mil=False):
-        if not Mil :
-            h=F.convolution_2d(x,W1,b1,self.stride,self.pad)
-            h=F.swish(h,1.)
-            h=F.convolution_2d(h,W2,b2,self.stride,self.pad)
-            return x+delta_t*p_t*h+np.sqrt(p_t*(1-p_t))*h*delta_W
-            else:
-                h=F.convolution_2d(x,W1,b1,self.stride,self.pad)
-                h=F.swish(h,1.)
-                h=F.convolution_2d(h,W2,b2,self.stride,self.pad)
-                return x+delta_t*h
-        else:
-            #Milstein
+        
             
             
             
@@ -165,10 +151,6 @@ class flowBlock(chainer.Chain):
 class param_gen(chainer.Chain):
     def __init__(self,channel,hypernet):
         super(param_gen, self).__init__()
-        self.Res=Res
-        self.hypernet=hypernet
-        self.channel=channel
-
         self.flowcon1_param=L.Convolution_2D(channel,channel,3,pad=1,stride=1)    
         self.flowcon2_param=L.Convolution_2D(channel,channel,3,pad=1,stride=1) 
         if hypernet:
@@ -198,30 +180,60 @@ class param_gen(chainer.Chain):
 
     
 
+class DeepSwamp(chainer.Chain):
+
+    def __init__(self, T,N,p_T,channel,hypernet):
+        super(SD, self).__init__()
+        self.T=T
+        self.N=N
+        self.p_T=p_T
+        self.param=param_gen(channel,hypernet)
+
+    def __call__(self, x,t,W,train):
+        step=0
+        t_now=0
+        for delta_t in t: 
+            p_t=p(t_now,self.T,self.p_T)
+            f_x=f(x,self.param(t))
+            if train:        
+                x = x+p_t*t[step]*f_x+np.sqrt(p_t*(1-p_t))*W[step]*f_x
+            else:#test
+                x=x+p_t*t[step]*f_x
+            step +=1
+            t_now +=delta_t
+        return x
+    def f(self,x,W1,b1,W2,b2):
+        x=F.convolution_2d(x,W1,b1,1,1)
+        x=F.swish(x)
+        x=F.convolution_2d(x,W2,b2,1,1)
+        return x
+    
+    
+    
+
 class flow_net(chainer.Chain):
-    def __init__(self,task_name,train,hypernet,T,N,p_T=0.5):
+    def __init__(self,task_name,hypernet,T,N,channel,train):
         super(flow_net,self).__init__()
-        self.task_name=task_name
-        self.train~train
-        self.hypernet=hypernet
+        p_T=0.5
         if task_name=="ResNet":
-            self.flow=ResNet(T,N)
+            pass
         elif task_name=="StochasticDepth":
-            self.flow=SD(T,N,p_T,train)
+            self.flow=SD(T,N,p_T,channel)
         elif task_name=="ODEnet":
-            self.flow=ODE(T,N,hypernet)
+            pass    
         elif task_name=="SDEnet":
-            self.flow=SDEnet(T,N,hypernet,train)
+            pass
         elif task_name=="Milstein":
             pass
         elif task_name=="Fukasawa":
-            self.flow=Fukasawa(T,N,hypernet,train)
+            self.flow=Fukasawa(T,N,p_T,channel,hypernet)
 
         else:
             print("invalid!")
             raise NotFoundError
-    def __call__(self,x,t,W):
-        
+    def __call__(self,x,t,W,train):
+        x=self.flow(x,t,W,train)
+        return x
         
     
 
@@ -229,50 +241,38 @@ class flow_net(chainer.Chain):
 
 
 class model(chainer.Chain):
-    def __init__(self, n_class,dense=False,channel,T,N,task_name,hypernet=False,first_conv=False,train_=True):
+    def __init__(self, n_class,dense=0,channel,T,N,task_name,hypernet=False,first_conv=False,train_=True):
         super(model,self).__init__()
         self.channel=channel
-        self.T=T
-        self.N=N
-        self.task_name=task_name
-        self.hypernet=hypernet
         self.first_conv=first_conv
         self.timelist=time_list(T,N,task_name)
         w = chainer.initializers.HeNormal(1e-2)        
         if first_conv:
-            self.firstconvf=L.Convolution_2D(3,3*channel,3,1,1,False,w)
+            self.firstconvf=L.Convolution_2D(3,channel,3,1,1,False,w)
         self.train=train_
-        if not self.train:
-            if self.prob:
-                task_name=="SDtest"
-            else:
-                task_name=="test"
         self.timelist=time_list(T,N,task_name)
         self.dense=dense
-        self.flow=flow_net(self.task_name,self.task_name,self.hypernet,self.T,self.N)
+        self.flow=flow_net(task_name,hypernet,T,N,channel,train)
         
         if dense:
-            self.fc1=L.Linear(3*channel,dense)
+            self.fc1=L.Linear(channel,dense)
             self.fc2=L.Linear(dense,n_class)
         else:
-            self.fc=L.Linear(3*channel,class)
+            self.fc=L.Linear(channel,class)
             
-    def __call__(self,x,t=None):
+    def __call__(self,x):
         
         if self.first_conv:
             x=self.firstconvf(x)
         else:
-            x = F.pad(x,[(0,0),(0,3*self.channel-3),(0,0),(0,0)],"constant",constant_values=0)
+            x = F.pad(x,[(0,0),(0,self.channel-3),(0,0),(0,0)],"constant",constant_values=0)
         t,W=self.timelist()
-        x=flow_net(x,t,W)
+        x=flow_net(x,t,W,self.train)
         x=F.average_pooling_2d(x, x.shape[2:])
         if self.dense:
             x=self.fc1(x)
             y=self.fc2(x)
         else self.dense:
             y=self.fc(x)
-        if self.train:
-            return F.softmax_cross_entropy(y, t), F.accuracy(y, t) 
-        else:
-            return y
+        return y
 
