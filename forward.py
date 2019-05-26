@@ -21,21 +21,18 @@ class time_list(object):
         self.T=T
         self.N=N
         self.task_name=task_name
-    def __call__(self):
+    def __call__(self,train):
         p_T=0.5
-        if task_name=="ODENet" or task_name=="ResNet",task_name=="test":
+        if not train:
             t,W=ODEnet(self.T,self.N)
         elif task_name =="StochasticDepth":
-            t,W =StochasticDepth(self.T,self.N,p_T)
-        elif task_name =="EularMaruyama" or task_name == "MilsteinNet":
-            t,W=EularMaruyama(self.T,self.N)
+            t,W =StochasticDepth(self.T,self.N)
         elif task_name=="Fukasawa":
-            t,W=Fukasawa(self.T,self.N,p_T)
-        elfi task_name == "SDtest":
-            t,W=SDtest(self.T,self.N,p_T)
+            t,W=Fukasawa(self.T,self.N)
         
         else:
             print("task_name is invalid!")
+            raise NotFoundError
         return t,W
     def ODEnet(self,T,N):
         t=[float(T)/(N+1)]*(N+1)
@@ -46,7 +43,7 @@ class time_list(object):
         t=[del_t]*(N+1)
         W = [0]*(N+1)
         t_now=0
-        a=[1,0]#p_tの情報含めたほうが早そう
+        a=[0,1]#p_tの情報含めたほうが早そう
         for i in range(N+1):
             p_t= p(t_now,T,p_T)
             W[i]= np.random.choice(a, size=None, replace=True, p=[p_t,1-p_t])
@@ -267,7 +264,7 @@ class model(chainer.Chain):
             x=self.firstconvf(x)
         else:
             x = F.pad(x,[(0,0),(0,self.channel-3),(0,0),(0,0)],"constant",constant_values=0)
-        t,W=self.timelist()
+        t,W=self.timelist(train)
         x=flow_net(x,t,W,train)
         x=F.average_pooling_2d(x, x.shape[2:])
         if self.dense:
