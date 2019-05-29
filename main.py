@@ -131,10 +131,3 @@ if __name__ == "__main__":
     dense=0
     channel=64
     model = train(forward.model(n_class,dense,channel,T,N,task_name,hypernet,first_conv=False),batchsize=128,gpu_id=gpu_id, max_epoch=10)
-<<<<<<< HEAD
-    
-=======
-    
-    
-    
->>>>>>> dc6f9881e3b0007d64c57f59eff0aa950bfc2577
