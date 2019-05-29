@@ -239,7 +239,7 @@ class flow_net(chainer.Chain):
 
 
 class model(chainer.Chain):
-    def __init__(self, n_class,dense=0,channel,T,N,task_name,hypernet=False,first_conv=False):
+    def __init__(self, n_class,dense,channel,T,N,task_name,hypernet=False,first_conv=False):
         super(model,self).__init__()
         self.channel=channel
         self.first_conv=first_conv
