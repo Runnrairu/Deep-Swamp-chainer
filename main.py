@@ -2,7 +2,6 @@
 import load_data #my.py
 
 import forward #my.py
-import loss_func #my.py
 import chainer
 import chainer.functions as F
 import chainer.links as L
@@ -73,8 +72,8 @@ def train(model_object, batchsize=100, gpu_id=gpu_id, max_epoch=200):
 
     # 3. Model
     
-    model = L.Classifier(model_object,lossfun=loss_func.loss_(model_object))
-    #model = L.Classifier(model_object)
+    #model = L.Classifier(model_object,lossfun=loss_func.loss_(model_object))
+    model = L.Classifier(model_object)
 
     if gpu_id >= 0:
         model.to_gpu(gpu_id)
@@ -87,7 +86,7 @@ def train(model_object, batchsize=100, gpu_id=gpu_id, max_epoch=200):
     updater = training.StandardUpdater(train_iter, optimizer, device=gpu_id)
 
     # 6. Trainer
-    trainer = training.Trainer(updater, (max_epoch, 'epoch'), out='log/{}_cifar10augmented_result'.format(model_object.__class__.__name__))
+    trainer = training.Trainer(updater, (max_epoch, 'epoch'), out='model/{}_cifar10_result'.format(model_object.__class__.__name__))
     trainer.extend(extensions.ExponentialShift('lr', 0.5),
                    trigger=triggers.ManualScheduleTrigger([30,60,90,120,150,180,210,240,270,300],'epoch'))
     trigger = triggers.MaxValueTrigger('validation/main/accuracy', trigger=(1, 'epoch'))
@@ -103,7 +102,9 @@ def train(model_object, batchsize=100, gpu_id=gpu_id, max_epoch=200):
 
         def evaluate(self):
             model = self.get_target('main')
+            model.train = False
             ret = super(TestModeEvaluator, self).evaluate()
+            model.train = True
             return ret
 
     trainer.extend(extensions.LogReport())
@@ -125,8 +126,9 @@ if __name__ == "__main__":
     T= 1
     N =52
     task_name = task_name
-    hypernet= 0
-    model = train(forward.DEmodel(10,T,N,task_name,hypernet),batchsize=128,gpu_id=gpu_id, max_epoch=300)
-    
-    
+    hypernet= True
+    n_class=10
+    dense=0
+    channel=64
+    model = train(forward.model(n_class,dense,channel,T,N,task_name,hypernet,first_conv=False),batchsize=128,gpu_id=gpu_id, max_epoch=10)
     
