@@ -95,7 +95,15 @@ class time_list(object):
             t[i]=p(t_now,T,p_T)
             t_now+=delta_t
         return t,W
-        
+ 
+
+
+def swish(x,minibatch):
+    if minibatch:
+        beta=np.ones(x.shape[1:],dtype=np.float32)
+    else:
+        beta=np.ones(x.shape[1:],dtype=np.float32)
+    return F.swish(x,beta)
 
         
         
@@ -109,7 +117,7 @@ class ResidualBlock(chainer.Chain):
            self.conv2 = L.Convolution2D(channel, channel, 3, 1, 1, False, w) 
    def __call__(self, x):
        h = self.conv1(x) 
-       h = F.swish(h)
+       h = swish(h,True)
        h = self.conv2(h)
        return  h
     
@@ -154,11 +162,12 @@ class param_gen(chainer.Chain):
             self.hy1=L.Linear(1,100)
             self.hy2=L.Linear(100,2*channel)
         self.hypernet=hypernet
+        self.channel=channel
     def __call__(self,t):
         if self.hypernet:
             h_1,h_2=self.hypernet_t(t)
-            W1=self.flowcon1_param.W*h_1.reshape(channnel,1,1,1)
-            W2=self.flowcon2_param.W*h_2.reshape(channnel,1,1,1)
+            W1=self.flowcon1_param.W*h_1.reshape(self.channel,1,1,1)
+            W2=self.flowcon2_param.W*h_2.reshape(self.channel,1,1,1)
             b1=self.flowcon1_param.b
             b2=self.flowcon2_param.b
         else:#ODENET
@@ -168,13 +177,14 @@ class param_gen(chainer.Chain):
             b2=self.flowcon2_param.b
         return W1,b1,W2,b2
     def hypernet_t(self,t):
-        t=np.array([t])
+        t=np.array([[t]])
         t=t.astype(np.float32)
         h=self.hy1(t)
-        h=F.swish(h)
+        h=swish(h,False)
         h=self.hy2(h)
-        
-        return h[0:self.channel],h[self.channel,2*self.channel]
+        h=F.transpose(h)
+
+        return h[0:self.channel],h[self.channel:2*self.channel]
 
     
 
@@ -192,7 +202,7 @@ class DeepSwamp(chainer.Chain):
         t_now=0
         for delta_t in t: 
             p_t=p(t_now,self.T,self.p_T)
-            W1,b1,W2,b2 = self.param(t)
+            W1,b1,W2,b2 = self.param(t_now)
             f_x=self.f(x,W1,b1,W2,b2)
             if train:        
                 x = x+p_t*t[step]*f_x+np.sqrt(p_t*(1-p_t))*W[step]*f_x
@@ -203,7 +213,7 @@ class DeepSwamp(chainer.Chain):
         return x
     def f(self,x,W1,b1,W2,b2):
         x=F.convolution_2d(x,W1,b1,1,1)
-        x=F.swish(x)
+        x=swish(x,True)
         x=F.convolution_2d(x,W2,b2,1,1)
         return x
     
@@ -271,6 +281,7 @@ class model(chainer.Chain):
         x=F.average_pooling_2d(x, x.shape[2:])
         if self.dense:
             x=self.fc1(x)
+            x=swish(x,True)
             y=self.fc2(x)
         else :
             y=self.fc(x)
