@@ -29,7 +29,6 @@ class time_list(object):
             t,W =StochasticDepth(self.T,self.N)
         elif task_name=="Fukasawa":
             t,W=Fukasawa(self.T,self.N)
-        
         else:
             print("task_name is invalid!")
             raise NotFoundError
@@ -149,13 +148,13 @@ class SD(chainer.ChainList):
 class param_gen(chainer.Chain):
     def __init__(self,channel,hypernet):
         super(param_gen, self).__init__()
-        self.flowcon1_param=L.Convolution_2D(channel,channel,3,pad=1,stride=1)    
-        self.flowcon2_param=L.Convolution_2D(channel,channel,3,pad=1,stride=1) 
+        self.flowcon1_param=L.Convolution2D(channel,channel,3,pad=1,stride=1)    
+        self.flowcon2_param=L.Convolution2D(channel,channel,3,pad=1,stride=1) 
         if hypernet:
             self.hy1=L.Linear(1,100)
             self.hy2=L.Linear(100,2*channel)
     def __call__(self,t):
-        if hypernet:
+        if self.hypernet:
             h_1,h_2=hypernet_t(t)
             W1=self.flowcon1_param.W*h_1.reshape(channnel,1,1,1)
             W2=self.flowcon2_param.W*h_2.reshape(channnel,1,1,1)
@@ -251,6 +250,7 @@ class model(chainer.Chain):
         
         self.timelist=time_list(T,N,task_name)
         self.dense=dense
+        #train=True
         self.flow=flow_net(task_name,hypernet,T,N,channel,train)
         
         if self.dense:
@@ -274,4 +274,3 @@ class model(chainer.Chain):
         else :
             y=self.fc(x)
         return y
-
