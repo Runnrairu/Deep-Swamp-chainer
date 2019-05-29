@@ -52,7 +52,7 @@ class time_list(object):
     def EularMaruyama(self,T,N):
         delta_t= float(T)/(N+1)
         t=[delta_t]*(N+1)
-        sigma=np.sqrt(del_t)
+        sigma=np.sqrt(delta_t)
         W = np.random.normal(0,sigma , N+1)
         return t,W
     def Fukasawa(self,T,N):
@@ -104,9 +104,10 @@ class ResidualBlock(chainer.Chain):
    def __init__(self, channel):
        w = chainer.initializers.HeNormal(1e-2)
        super(ResidualBlock, self).__init__()
+       
        with self.init_scope():
-           self.conv1 = L.Convolution2D(channel, channel, 3,stride=1,1, False, w)
-           self.conv2 = L.Convolution2D(channel, channel, 3, stride=1, 1, False, w) 
+           self.conv1 = L.Convolution2D(channel, channel, 3,1,1, False, w)
+           self.conv2 = L.Convolution2D(channel, channel, 3, 1, 1, False, w) 
    def __call__(self, x):
        h = self.conv1(x) 
        h = F.swish(h)
@@ -130,7 +131,7 @@ class SD(chainer.ChainList):
    def __call__(self, x,t,W,train):
        step=0
        for f in self:
-           if train and W[step]=0:
+           if train and W[step]==0:
                x=x
            elif train:        
                x = x+t[step]*f(x)
@@ -252,11 +253,11 @@ class model(chainer.Chain):
         self.dense=dense
         self.flow=flow_net(task_name,hypernet,T,N,channel,train)
         
-        if dense:
+        if self.dense:
             self.fc1=L.Linear(channel,dense)
             self.fc2=L.Linear(dense,n_class)
         else:
-            self.fc=L.Linear(channel,class)
+            self.fc=L.Linear(channel,n_class)
             
     def __call__(self,x,train):
         
@@ -270,7 +271,7 @@ class model(chainer.Chain):
         if self.dense:
             x=self.fc1(x)
             y=self.fc2(x)
-        else self.dense:
+        else :
             y=self.fc(x)
         return y
 
