@@ -2,7 +2,6 @@
 import load_data #my.py
 
 import forward #my.py
-import loss_func #my.py
 import chainer
 import chainer.functions as F
 import chainer.links as L
@@ -128,6 +127,7 @@ if __name__ == "__main__":
     hypernet= True
     n_class=10
     dense=0
+    channel=64
     model = train(forward.model(n_class,dense,channel,T,N,task_name,hypernet,first_conv=False),batchsize=128,gpu_id=gpu_id, max_epoch=10)
     
     
