@@ -157,7 +157,7 @@ class SD(chainer.ChainList):
             
             
 class param_gen(chainer.Chain):
-    def __init__(self,channel,hypernet):
+    def __init__(self,channel,hypernet,gpu_id):
         super(param_gen, self).__init__()
         with self.init_scope():
             self.flowcon1_param=L.Convolution2D(channel,channel,3,pad=1,stride=1)    
@@ -167,6 +167,7 @@ class param_gen(chainer.Chain):
                 self.hy2=L.Linear(100,2*channel)
         self.hypernet=hypernet
         self.channel=channel
+        self.gpu_id=gpu_id
     def __call__(self,t):
         if self.hypernet:
             h_1,h_2=self.hypernet_t(t)
@@ -182,8 +183,12 @@ class param_gen(chainer.Chain):
         return W1,b1,W2,b2
         
     def hypernet_t(self,t):
-        t=xp.array([[t]])
-        t=t.astype(xp.float32)
+        if self.gpu_id<0:
+            t=np.array([[t]])
+            t=t.astype(np.float32)
+        else:
+            t=xp.array([[t]])
+            t=t.astype(xp.float32)
         h=self.hy1(t)
         h=swish(h,False)
         h=self.hy2(h)
@@ -195,14 +200,14 @@ class param_gen(chainer.Chain):
 
 class DeepSwamp(chainer.Chain):
 
-    def __init__(self, T,N,p_T,channel,hypernet):
+    def __init__(self, T,N,p_T,channel,hypernet,gpu_id):
         super(DeepSwamp, self).__init__()
         
         with self.init_scope():
             self.T=T
             self.N=N
             self.p_T=p_T
-            self.param=param_gen(channel,hypernet)
+            self.param=param_gen(channel,hypernet,gpu_id)
 
     def __call__(self, x,t,W,train):
         step=0
@@ -228,7 +233,7 @@ class DeepSwamp(chainer.Chain):
     
 
 class flow_net(chainer.Chain):
-    def __init__(self,task_name,hypernet,T,N,channel,train):
+    def __init__(self,task_name,hypernet,T,N,channel,train,gpu_id):
         super(flow_net,self).__init__()
         with self.init_scope():
             p_T=0.5
@@ -243,7 +248,7 @@ class flow_net(chainer.Chain):
             elif task_name=="Milstein":
                 pass
             elif task_name=="Fukasawa":
-                self.flow=DeepSwamp(T,N,p_T,channel,hypernet)
+                self.flow=DeepSwamp(T,N,p_T,channel,hypernet,gpu_id)
 
             else:
                 print("invalid!")
@@ -258,7 +263,7 @@ class flow_net(chainer.Chain):
 
 
 class model(chainer.Chain):
-    def __init__(self, n_class,dense,channel,T,N,task_name,hypernet=False,first_conv=False):
+    def __init__(self, n_class,dense,channel,T,N,task_name,hypernet=False,first_conv=False,gpu_id=-1):
         super(model,self).__init__()
         
         with self.init_scope():
@@ -272,7 +277,7 @@ class model(chainer.Chain):
             self.timelist=time_list(T,N,task_name)
             self.dense=dense
             self.train=True
-            self.flow=flow_net(task_name,hypernet,T,N,channel,self.train)
+            self.flow=flow_net(task_name,hypernet,T,N,channel,self.train,gpu_id)
             
             if self.dense:
                 self.fc1=L.Linear(channel,dense)
