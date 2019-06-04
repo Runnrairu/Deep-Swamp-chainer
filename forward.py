@@ -98,10 +98,10 @@ class time_list(object):
  
 
 
-def swish(x,minibatch):
+def swish(x,gpu_id):
 
-    if minibatch:
-        beta=xp.ones(x.shape[1:],dtype=np.float32)
+    if gpu_id<0:
+        beta=np.ones(x.shape[1:],dtype=np.float32)
     else:
         beta=xp.ones(x.shape[1:],dtype=np.float32)
     return F.swish(x,beta)
@@ -109,16 +109,17 @@ def swish(x,minibatch):
         
         
 class ResidualBlock(chainer.Chain):
-   def __init__(self, channel):
+   def __init__(self, channel,gpu_id):
        w = chainer.initializers.HeNormal(1e-2)
        super(ResidualBlock, self).__init__()
        
        with self.init_scope():
            self.conv1 = L.Convolution2D(channel, channel, 3,1,1, False, w)
            self.conv2 = L.Convolution2D(channel, channel, 3, 1, 1, False, w) 
+           self.gpu_id=gpu_id
    def __call__(self, x):
        h = self.conv1(x) 
-       h = swish(h,True)
+       h = swish(h,self.gpu_id)
        h = self.conv2(h)
        return  h
     
@@ -128,7 +129,7 @@ class ResidualBlock(chainer.Chain):
 
 class SD(chainer.ChainList):
 
-   def __init__(self, T,N,p_T,channel):
+   def __init__(self, T,N,p_T,channel,gpu_id ):
         super(SD, self).__init__()
 
         with self.init_scope():
@@ -136,7 +137,7 @@ class SD(chainer.ChainList):
             self.N=N
             self.p_T=p_T
             for _ in range(N):
-                self.add_link(ResidualBlock(channel))
+                self.add_link(ResidualBlock(channel,gpu_id))
 
    def __call__(self, x,t,W,train):
        step=0
@@ -190,7 +191,7 @@ class param_gen(chainer.Chain):
             t=xp.array([[t]])
             t=t.astype(xp.float32)
         h=self.hy1(t)
-        h=swish(h,False)
+        h=swish(h,self.gpu_id)
         h=self.hy2(h)
         h=F.transpose(h)
 
@@ -208,6 +209,7 @@ class DeepSwamp(chainer.Chain):
             self.N=N
             self.p_T=p_T
             self.param=param_gen(channel,hypernet,gpu_id)
+            self.gpu_id=gpu_id
 
     def __call__(self, x,t,W,train):
         step=0
@@ -225,7 +227,7 @@ class DeepSwamp(chainer.Chain):
         return x
     def f(self,x,W1,b1,W2,b2):
         x=F.convolution_2d(x,W1,b1,1,1)
-        x=swish(x,True)
+        x=swish(x,self.gpu_id)
         x=F.convolution_2d(x,W2,b2,1,1)
         return x
     
@@ -240,7 +242,7 @@ class flow_net(chainer.Chain):
             if task_name=="ResNet":
                 pass
             elif task_name=="StochasticDepth":
-                self.flow=SD(T,N,p_T,channel)
+                self.flow=SD(T,N,p_T,channel,gpu_id)
             elif task_name=="ODEnet":
                 pass    
             elif task_name=="SDEnet":
@@ -296,7 +298,7 @@ class model(chainer.Chain):
         x=F.average_pooling_2d(x, x.shape[2:])
         if self.dense:
             x=self.fc1(x)
-            x=swish(x,True)
+            x=swish(x,self.gpu_id)
             y=self.fc2(x)
         else :
             y=self.fc(x)
