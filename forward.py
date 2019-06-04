@@ -3,7 +3,7 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 import numpy as np
-
+xp = chainer.cuda.cupy
 def p(t,T,p_T):
     return 1-float(t)*(1-p_T)/T
 
@@ -99,10 +99,11 @@ class time_list(object):
 
 
 def swish(x,minibatch):
+
     if minibatch:
-        beta=np.ones(x.shape[1:],dtype=np.float32)
+        beta=xp.ones(x.shape[1:],dtype=np.float32)
     else:
-        beta=np.ones(x.shape[1:],dtype=np.float32)
+        beta=xp.ones(x.shape[1:],dtype=np.float32)
     return F.swish(x,beta)
 
         
@@ -128,12 +129,14 @@ class ResidualBlock(chainer.Chain):
 class SD(chainer.ChainList):
 
    def __init__(self, T,N,p_T,channel):
-       super(SD, self).__init__()
-       self.T=T
-       self.N=N
-       self.p_T=p_T
-       for _ in range(N):
-           self.add_link(ResidualBlock(channel))
+        super(SD, self).__init__()
+
+        with self.init_scope():
+            self.T=T
+            self.N=N
+            self.p_T=p_T
+            for _ in range(N):
+                self.add_link(ResidualBlock(channel))
 
    def __call__(self, x,t,W,train):
        step=0
@@ -156,11 +159,12 @@ class SD(chainer.ChainList):
 class param_gen(chainer.Chain):
     def __init__(self,channel,hypernet):
         super(param_gen, self).__init__()
-        self.flowcon1_param=L.Convolution2D(channel,channel,3,pad=1,stride=1)    
-        self.flowcon2_param=L.Convolution2D(channel,channel,3,pad=1,stride=1) 
-        if hypernet:
-            self.hy1=L.Linear(1,100)
-            self.hy2=L.Linear(100,2*channel)
+        with self.init_scope():
+            self.flowcon1_param=L.Convolution2D(channel,channel,3,pad=1,stride=1)    
+            self.flowcon2_param=L.Convolution2D(channel,channel,3,pad=1,stride=1) 
+            if hypernet:
+                self.hy1=L.Linear(1,100)
+                self.hy2=L.Linear(100,2*channel)
         self.hypernet=hypernet
         self.channel=channel
     def __call__(self,t):
@@ -176,9 +180,10 @@ class param_gen(chainer.Chain):
             b1=self.flowcon1_param.b
             b2=self.flowcon2_param.b
         return W1,b1,W2,b2
+        
     def hypernet_t(self,t):
-        t=np.array([[t]])
-        t=t.astype(np.float32)
+        t=xp.array([[t]])
+        t=t.astype(xp.float32)
         h=self.hy1(t)
         h=swish(h,False)
         h=self.hy2(h)
@@ -192,10 +197,12 @@ class DeepSwamp(chainer.Chain):
 
     def __init__(self, T,N,p_T,channel,hypernet):
         super(DeepSwamp, self).__init__()
-        self.T=T
-        self.N=N
-        self.p_T=p_T
-        self.param=param_gen(channel,hypernet)
+        
+        with self.init_scope():
+            self.T=T
+            self.N=N
+            self.p_T=p_T
+            self.param=param_gen(channel,hypernet)
 
     def __call__(self, x,t,W,train):
         step=0
@@ -223,23 +230,24 @@ class DeepSwamp(chainer.Chain):
 class flow_net(chainer.Chain):
     def __init__(self,task_name,hypernet,T,N,channel,train):
         super(flow_net,self).__init__()
-        p_T=0.5
-        if task_name=="ResNet":
-            pass
-        elif task_name=="StochasticDepth":
-            self.flow=SD(T,N,p_T,channel)
-        elif task_name=="ODEnet":
-            pass    
-        elif task_name=="SDEnet":
-            pass
-        elif task_name=="Milstein":
-            pass
-        elif task_name=="Fukasawa":
-            self.flow=DeepSwamp(T,N,p_T,channel,hypernet)
+        with self.init_scope():
+            p_T=0.5
+            if task_name=="ResNet":
+                pass
+            elif task_name=="StochasticDepth":
+                self.flow=SD(T,N,p_T,channel)
+            elif task_name=="ODEnet":
+                pass    
+            elif task_name=="SDEnet":
+                pass
+            elif task_name=="Milstein":
+                pass
+            elif task_name=="Fukasawa":
+                self.flow=DeepSwamp(T,N,p_T,channel,hypernet)
 
-        else:
-            print("invalid!")
-            raise NotFoundError
+            else:
+                print("invalid!")
+                raise NotFoundError
     def __call__(self,x,t,W,train):
         x=self.flow(x,t,W,train)
         return x
@@ -252,23 +260,25 @@ class flow_net(chainer.Chain):
 class model(chainer.Chain):
     def __init__(self, n_class,dense,channel,T,N,task_name,hypernet=False,first_conv=False):
         super(model,self).__init__()
-        self.channel=channel
-        self.first_conv=first_conv
-        self.timelist=time_list(T,N,task_name)
-        w = chainer.initializers.HeNormal(1e-2)        
-        if first_conv:
-            self.firstconvf=L.Convolution_2D(3,channel,3,1,1,False,w)
         
-        self.timelist=time_list(T,N,task_name)
-        self.dense=dense
-        self.train=True
-        self.flow=flow_net(task_name,hypernet,T,N,channel,self.train)
-        
-        if self.dense:
-            self.fc1=L.Linear(channel,dense)
-            self.fc2=L.Linear(dense,n_class)
-        else:
-            self.fc=L.Linear(channel,n_class)
+        with self.init_scope():
+            self.channel=channel
+            self.first_conv=first_conv
+            self.timelist=time_list(T,N,task_name)
+            w = chainer.initializers.HeNormal(1e-2)        
+            if first_conv:
+                self.firstconvf=L.Convolution_2D(3,channel,3,1,1,False,w)
+            
+            self.timelist=time_list(T,N,task_name)
+            self.dense=dense
+            self.train=True
+            self.flow=flow_net(task_name,hypernet,T,N,channel,self.train)
+            
+            if self.dense:
+                self.fc1=L.Linear(channel,dense)
+                self.fc2=L.Linear(dense,n_class)
+            else:
+                self.fc=L.Linear(channel,n_class)
             
     def __call__(self,x):
         train=self.train
