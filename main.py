@@ -82,6 +82,11 @@ def train(model_object, batchsize=100, gpu_id=gpu_id, max_epoch=200):
     optimizer = optimizers.MomentumSGD(0.05)
     optimizer.setup(model)
 
+    weight_decay_hook = chainer.optimizer_hooks.WeightDecay(0.0001)
+    for p in model.params():
+        if len(p.shape) >= 2:
+            p.update_rule.add_hook(weight_decay_hook)
+
     # 5. Updater
     updater = training.StandardUpdater(train_iter, optimizer, device=gpu_id)
 
