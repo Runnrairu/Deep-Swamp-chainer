@@ -136,4 +136,5 @@ if __name__ == "__main__":
     dense=0
     channel=64
     gpu_id=-1
-    model = train(forward.model(n_class,dense,channel,T,N,task_name,hypernet,first_conv=False,gpu_id),batchsize=128,gpu_id=gpu_id, max_epoch=10)
+    first_conv=True
+    model = train(forward.model(n_class,dense,channel,T,N,task_name,hypernet,first_conv,gpu_id),batchsize=128,gpu_id=gpu_id, max_epoch=10)
