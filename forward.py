@@ -280,7 +280,7 @@ class model(chainer.Chain):
             self.dense=dense
             self.train=True
             self.flow=flow_net(task_name,hypernet,T,N,channel,self.train,gpu_id)
-            
+            self.gpu_id=gpu_id
             if self.dense:
                 self.fc1=L.Linear(channel,dense)
                 self.fc2=L.Linear(dense,n_class)
