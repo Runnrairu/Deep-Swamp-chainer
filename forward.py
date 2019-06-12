@@ -274,7 +274,7 @@ class model(chainer.Chain):
             self.timelist=time_list(T,N,task_name)
             w = chainer.initializers.HeNormal(1e-2)        
             if first_conv:
-                self.firstconvf=L.Convolution_2D(3,channel,3,1,1,False,w)
+                self.firstconvf=L.Convolution2D(3,channel,3,1,1,False,w)
             
             self.timelist=time_list(T,N,task_name)
             self.dense=dense
