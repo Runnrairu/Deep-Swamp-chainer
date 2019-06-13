@@ -165,17 +165,17 @@ class param_gen(chainer.Chain):
             self.flowcon2_param=L.Convolution2D(channel,channel,3,pad=1,stride=1) 
             if hypernet:
                 self.hy1=L.Linear(1,100)
-                self.hy2=L.Linear(100,2*channel)
+                self.hy2=L.Linear(100,2*channel+2)
         self.hypernet=hypernet
         self.channel=channel
         self.gpu_id=gpu_id
     def __call__(self,t):
         if self.hypernet:
-            h_1,h_2=self.hypernet_t(t)
+            h_1,h_2,c1,c2=self.hypernet_t(t)
             W1=self.flowcon1_param.W*h_1.reshape(self.channel,1,1,1)
             W2=self.flowcon2_param.W*h_2.reshape(self.channel,1,1,1)
-            b1=self.flowcon1_param.b
-            b2=self.flowcon2_param.b
+            b1=self.flowcon1_param.b*c1
+            b2=self.flowcon2_param.b*c2
         else:#ODENET
             W1=self.flowcon1_param.W
             W2=self.flowcon2_param.W
@@ -195,7 +195,7 @@ class param_gen(chainer.Chain):
         h=self.hy2(h)
         h=F.transpose(h)
 
-        return h[0:self.channel],h[self.channel:2*self.channel]
+        return h[0:self.channel],h[self.channel:2*self.channel],h[-2],h[-1]
 
     
 
