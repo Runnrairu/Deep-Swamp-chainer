@@ -42,7 +42,7 @@ class time_list(object):
         t=[del_t]*(N+1)
         W = [0]*(N+1)
         t_now=0
-        a=[0,1]#p_tの情報含めたほうが早そう
+        a=[1,0]#p_tの情報含めたほうが早そう
         for i in range(N+1):
             p_t= p(t_now,T,p_T)
             W[i]= np.random.choice(a, size=None, replace=True, p=[p_t,1-p_t])
