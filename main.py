@@ -122,9 +122,9 @@ def train(model_object, batchsize=100, gpu_id=gpu_id, max_epoch=200):
 
     return model
 
+task_list=["StochasticDepth","Fukasawa"]
 
-
-task_name ="Fukasawa"
+task_name =task_list[0]
 
 if __name__ == "__main__":
     
