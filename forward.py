@@ -117,10 +117,17 @@ class ResidualBlock(chainer.Chain):
            self.conv1 = L.Convolution2D(channel, channel, 3,1,1, False, w)
            self.conv2 = L.Convolution2D(channel, channel, 3, 1, 1, False, w) 
            self.gpu_id=gpu_id
+           self.bn1 = L.BatchNormalization(channel)
+           self.bn2 = L.BatchNormalization(channel)
+           self.bn3 = L.BatchNormalization(channel)
    def __call__(self, x):
-       h = self.conv1(x) 
+       h = self.bn1(x)
+       h = self.conv1(h) 
        h = swish(h,self.gpu_id)
+       h = self.bn2(h)
        h = self.conv2(h)
+       h = self.bn3(h)
+      
        return  h
     
 
