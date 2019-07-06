@@ -217,6 +217,9 @@ class DeepSwamp(chainer.Chain):
             self.p_T=p_T
             self.param=param_gen(channel,hypernet,gpu_id)
             self.gpu_id=gpu_id
+            self.bn1 = L.BatchNormalization(channel)
+            self.bn2 = L.BatchNormalization(channel)
+            self.bn3 = L.BatchNormalization(channel)
 
     def __call__(self, x,t,W,train):
         step=0
@@ -233,9 +236,12 @@ class DeepSwamp(chainer.Chain):
             t_now +=delta_t
         return x
     def f(self,x,W1,b1,W2,b2):
+        x=self.bn1(x)
         x=F.convolution_2d(x,W1,b1,1,1)
         x=swish(x,self.gpu_id)
+        x=self.bn2(x)
         x=F.convolution_2d(x,W2,b2,1,1)
+        x=self.bn3(x)
         return x
     
     
