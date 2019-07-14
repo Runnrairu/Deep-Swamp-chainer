@@ -27,7 +27,7 @@ class time_list(object):
         if not train:
             t,W=self.ODEnet(self.T,self.N)
         elif self.task_name =="StochasticDepth":
-            t,W =self.StochasticDepth(self.T,self.N,p_T)
+            t,W =self.StochasticDepth(self.T,self.N,self.p_T)
         elif self.task_name=="Fukasawa":
             t,W=self.Fukasawa(self.T,self.N,self.p_T)
         else:
@@ -237,10 +237,11 @@ class DeepSwamp(chainer.Chain):
             t_now +=delta_t
         return x
     def f(self,x,W1,b1,W2,b2,t_now):
+        x=self.bn1(x)
         if not self.hypernet:
             x= F.pad(x,[(0,0),(0,1),(0,0),(0,0)],"constant",constant_values=t_now)
         
-        x=self.bn1(x)
+        
         x=F.convolution_2d(x,W1,b1,1,1)
         x=swish(x,self.gpu_id)
         x=self.bn2(x)
