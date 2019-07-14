@@ -17,18 +17,19 @@ def G_nm(n,t_now):
 
 
 class time_list(object):
-    def __init__(self, T,N,task_name):
+    def __init__(self, T,N,task_name,p_T):
         self.T=T
         self.N=N
         self.task_name=task_name
+        self.p_T=p_T
     def __call__(self,train):
 
         if not train:
             t,W=self.ODEnet(self.T,self.N)
         elif self.task_name =="StochasticDepth":
-            t,W =self.StochasticDepth(self.T,self.N)
+            t,W =self.StochasticDepth(self.T,self.N,p_T)
         elif self.task_name=="Fukasawa":
-            t,W=self.Fukasawa(self.T,self.N)
+            t,W=self.Fukasawa(self.T,self.N,self.p_T)
         else:
             print("task_name is invalid!")
             raise NotFoundError
@@ -37,7 +38,7 @@ class time_list(object):
         t=[float(T)/(N+1)]*(N+1)
         W = [0]*(N+1)
         return t,W
-    def StochasticDepth(self,T,N,p_T=0.5):
+    def StochasticDepth(self,T,N,p_T):
         del_t= float(T)/(N+1)
         t=[del_t]*(N+1)
         W = [0]*(N+1)
@@ -54,7 +55,7 @@ class time_list(object):
         sigma=np.sqrt(delta_t)
         W = np.random.normal(0,sigma , N+1)
         return t,W
-    def Fukasawa(self,T,N):
+    def Fukasawa(self,T,N,p_T):
         n=N
         t = [0]*(N+1)
         W=[0]*(N+1)
@@ -86,16 +87,7 @@ class time_list(object):
             t[m+i] = delta_euler_t
             W[m+i] = sigma_euler_t*N_list[m+i]
         return t,W
-    def SDtest(self,T,N,p_T=0.5):
-        t=[0]*(N+1)
-        W = [0]*(N+1)
-        t_now=0
-        delta_t= float(T)/(N+1)
-        for i in range(N+1):
-            t[i]=p(t_now,T,p_T)
-            t_now+=delta_t
-        return t,W
- 
+
 
 
 def swish(x,gpu_id):
@@ -166,18 +158,26 @@ class SD(chainer.ChainList):
             
 class param_gen(chainer.Chain):
     def __init__(self,channel,hypernet,gpu_id):
+        w = chainer.initializers.HeNormal(1e-2)
         super(param_gen, self).__init__()
+        
         with self.init_scope():
-            self.flowcon1_param=L.Convolution2D(channel,channel,3,pad=1,stride=1)    
-            self.flowcon2_param=L.Convolution2D(channel,channel,3,pad=1,stride=1) 
-            if hypernet:
+            pad=1
+            stride=1
+            if not hypernet:
+                self.flowcon1_param=L.Convolution2D(channel+1,channel,3,pad,stride,False,w)    
+                self.flowcon2_param=L.Convolution2D(channel+1,channel,3,pad,stride,False,w) 
+            else:
+                self.flowcon1_param=L.Convolution2D(channel,channel,3,pad,stride,False,w)    
+                self.flowcon2_param=L.Convolution2D(channel,channel,3,pad,stride,False,w)
+            if hypernet==1:
                 self.hy1=L.Linear(1,100)
                 self.hy2=L.Linear(100,2*channel+2)
         self.hypernet=hypernet
         self.channel=channel
         self.gpu_id=gpu_id
     def __call__(self,t):
-        if self.hypernet:
+        if self.hypernet==1:
             h_1,h_2,c1,c2=self.hypernet_t(t)
             W1=self.flowcon1_param.W*h_1.reshape(self.channel,1,1,1)
             W2=self.flowcon2_param.W*h_2.reshape(self.channel,1,1,1)
@@ -220,6 +220,7 @@ class DeepSwamp(chainer.Chain):
             self.bn1 = L.BatchNormalization(channel)
             self.bn2 = L.BatchNormalization(channel)
             self.bn3 = L.BatchNormalization(channel)
+            self.hypernet = hypernet
 
     def __call__(self, x,t,W,train):
         step=0
@@ -227,7 +228,7 @@ class DeepSwamp(chainer.Chain):
         for delta_t in t: 
             p_t=p(t_now,self.T,self.p_T)
             W1,b1,W2,b2 = self.param(t_now)
-            f_x=self.f(x,W1,b1,W2,b2)
+            f_x=self.f(x,W1,b1,W2,b2,t_now)
             if train:        
                 x = x+p_t*t[step]*f_x+np.sqrt(p_t*(1-p_t))*W[step]*f_x
             else:#test
@@ -235,11 +236,16 @@ class DeepSwamp(chainer.Chain):
             step +=1
             t_now +=delta_t
         return x
-    def f(self,x,W1,b1,W2,b2):
+    def f(self,x,W1,b1,W2,b2,t_now):
+        if not self.hypernet:
+            x= F.pad(x,[(0,0),(0,1),(0,0),(0,0)],"constant",constant_values=t_now)
+        
         x=self.bn1(x)
         x=F.convolution_2d(x,W1,b1,1,1)
         x=swish(x,self.gpu_id)
         x=self.bn2(x)
+        if not self.hypernet:
+            x= F.pad(x,[(0,0),(0,1),(0,0),(0,0)],"constant",constant_values=t_now)
         x=F.convolution_2d(x,W2,b2,1,1)
         x=self.bn3(x)
         return x
@@ -248,10 +254,10 @@ class DeepSwamp(chainer.Chain):
     
 
 class flow_net(chainer.Chain):
-    def __init__(self,task_name,hypernet,T,N,channel,train,gpu_id):
+    def __init__(self,task_name,hypernet,T,N,channel,train,gpu_id,p_T):
         super(flow_net,self).__init__()
         with self.init_scope():
-            p_T=0.5
+            
             if task_name=="ResNet":
                 pass
             elif task_name=="StochasticDepth":
@@ -278,22 +284,23 @@ class flow_net(chainer.Chain):
 
 
 class model(chainer.Chain):
-    def __init__(self, n_class,dense,channel,T,N,task_name,hypernet=False,first_conv=False,gpu_id=-1):
+    def __init__(self, n_class,dense,channel,T,N,task_name,hypernet=False,first_conv=False,gpu_id=-1,p_T=0.5):
         super(model,self).__init__()
         
         with self.init_scope():
             self.channel=channel
             self.first_conv=first_conv
-            self.timelist=time_list(T,N,task_name)
+            self.timelist=time_list(T,N,task_name,p_T)
             w = chainer.initializers.HeNormal(1e-2)        
             if first_conv:
                 self.firstconvf=L.Convolution2D(3,channel,3,1,1,False,w)
             
-            self.timelist=time_list(T,N,task_name)
+            self.timelist=time_list(T,N,task_name,p_T)
             self.dense=dense
             self.train=True
-            self.flow=flow_net(task_name,hypernet,T,N,channel,self.train,gpu_id)
+            self.flow=flow_net(task_name,hypernet,T,N,channel,self.train,gpu_id,p_T)
             self.gpu_id=gpu_id
+            self.p_T=0.5
             if self.dense:
                 self.fc1=L.Linear(channel,dense)
                 self.fc2=L.Linear(dense,n_class)
@@ -315,5 +322,5 @@ class model(chainer.Chain):
             y=self.fc2(x)
         else :
             y=self.fc(x)
-        return y
 
+        return y
