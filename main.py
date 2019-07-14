@@ -131,10 +131,11 @@ if __name__ == "__main__":
     T= 1
     N =52
     task_name = task_name
-    hypernet= True
+    hypernet= 0
     n_class=10
     dense=0
     channel=64
     gpu_id=-1
     first_conv=True
-    model = train(forward.model(n_class,dense,channel,T,N,task_name,hypernet,first_conv,gpu_id),batchsize=128,gpu_id=gpu_id, max_epoch=10)
+    p_T=0.5
+    model = train(forward.model(n_class,dense,channel,T,N,task_name,hypernet,first_conv,gpu_id,p_T),batchsize=128,gpu_id=gpu_id, max_epoch=10)
