@@ -46,7 +46,7 @@ class data_augment(dataset.DatasetMixin):
             if np.random.randint(0, 1):
                 x = x[:, :, ::-1]
             #random mask
-            if False:
+            if np.random.randint(0,1):
                 x = x.transpose(1, 2, 0)
                 h, w, _ = x.shape
                 min_cut=1
