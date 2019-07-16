@@ -178,11 +178,11 @@ class param_gen(chainer.Chain):
         self.gpu_id=gpu_id
     def __call__(self,t):
         if self.hypernet==1:
-            h_1,h_2,c1,c2=self.hypernet_t(t)
+            h_1,h_2=self.hypernet_t(t)
             W1=self.flowcon1_param.W*h_1.reshape(self.channel,1,1,1)
             W2=self.flowcon2_param.W*h_2.reshape(self.channel,1,1,1)
-            b1=self.flowcon1_param.b*h_1
-            b2=self.flowcon2_param.b*h_2
+            b1=self.flowcon1_param.b*h_1[0]
+            b2=self.flowcon2_param.b*h_2[0]
         else:#ODENET
             W1=self.flowcon1_param.W
             W2=self.flowcon2_param.W
